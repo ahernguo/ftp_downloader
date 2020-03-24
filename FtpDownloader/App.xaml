@@ -4,6 +4,14 @@
              xmlns:local="clr-namespace:FtpDownloader"
              StartupUri="MainWindow.xaml">
     <Application.Resources>
-         
+		<ResourceDictionary>
+			<Style x:Key="centTB" TargetType="TextBlock">
+				<Setter Property="HorizontalAlignment" Value="Center"/>
+				<Setter Property="VerticalAlignment" Value="Center"/>
+			</Style>
+			<Style x:Key="centHead" TargetType="DataGridColumnHeader">
+				<Setter Property="HorizontalContentAlignment" Value="Center"/>
+			</Style>
+		</ResourceDictionary>
     </Application.Resources>
 </Application>
