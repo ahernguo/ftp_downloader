@@ -3,12 +3,12 @@ using System.Collections.ObjectModel;
 using System.Collections.Specialized;
 using System.Windows.Threading;
 
-namespace FtpDownloader {
+namespace Ahern.General {
 
 	/// <summary>代表在加入和移除項目時，或重新整理整份清單時提供通知的動態資料集合。於通知過程中調用對應的 <see cref="Dispatcher"/></summary>
 	/// <typeparam name="T">集合中項目的類型</typeparam>
 	/// <remarks>修改範本: https://stackoverflow.com/questions/23108045/how-to-make-observablecollection-thread-safe/23108315#23108315 </remarks>
-	internal class WpfObservableCollection<T> : ObservableCollection<T> {
+	public class WpfObservableCollection<T> : ObservableCollection<T> {
 	
 		#region Overrides
 		/// <summary>加入、移除、變更或移動項目者或重新整理整個清單</summary>

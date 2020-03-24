@@ -1,25 +1,17 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
+﻿using Ahern.General;
 using System.Windows;
-using System.Windows.Controls;
-using System.Windows.Data;
-using System.Windows.Documents;
-using System.Windows.Input;
-using System.Windows.Media;
-using System.Windows.Media.Imaging;
-using System.Windows.Navigation;
-using System.Windows.Shapes;
 
-namespace FtpDownloader {
+namespace Ahern.GUI {
 
-	/// <summary>下載進度與項目之互動邏輯</summary>
+	/// <summary>下載器之互動邏輯</summary>
 	public partial class MainWindow : Window {
 
 		#region Constructor
-		public MainWindow() {
+		public MainWindow(IDownloader context) {
+			/* 初始化介面 */
 			InitializeComponent();
+			/* 設定文本 */
+			this.DataContext = context;
 		}
 		#endregion
 

@@ -56,6 +56,11 @@
       <Generator>MSBuild:Compile</Generator>
       <SubType>Designer</SubType>
     </ApplicationDefinition>
+    <Compile Include="Modules\ChunkUnit.cs" />
+    <Compile Include="Modules\CommandParser.cs" />
+    <Compile Include="Modules\IDownloader.cs" />
+    <Compile Include="Modules\IRemoteObject.cs" />
+    <Compile Include="ViewModel\DownloaderBase.cs" />
     <Page Include="MainWindow.xaml">
       <Generator>MSBuild:Compile</Generator>
       <SubType>Designer</SubType>

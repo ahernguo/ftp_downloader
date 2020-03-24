@@ -4,7 +4,7 @@ using System.IO;
 using System.Linq;
 using System.Net;
 
-namespace FtpDownloader {
+namespace Ahern.Ftp {
 
 	/// <summary>存取遠端 FTP 站台之檔案、資料夾之互動元件</summary>
 	internal class FtpClient : IDisposable {
