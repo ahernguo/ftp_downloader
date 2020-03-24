@@ -72,6 +72,7 @@
   <ItemGroup>
     <Compile Include="Modules\FtpClient.cs" />
     <Compile Include="Modules\FtpObjects.cs" />
+    <Compile Include="Modules\WpfObservableCollection.cs" />
     <Compile Include="Properties\AssemblyInfo.cs">
       <SubType>Code</SubType>
     </Compile>
