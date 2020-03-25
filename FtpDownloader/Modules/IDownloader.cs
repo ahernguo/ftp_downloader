@@ -17,6 +17,8 @@ namespace Ahern.General {
 		string CurrentSize { get; }
 		/// <summary>取得所需下載的大小</summary>
 		string MaximumSize { get; }
+		/// <summary>取得當前的下載狀態資訊</summary>
+		string Info { get; }
 		#endregion
 
 		#region File List

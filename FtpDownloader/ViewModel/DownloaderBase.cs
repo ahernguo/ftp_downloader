@@ -19,6 +19,8 @@ namespace Ahern.Ftp {
 		private string mCurSz;
 		/// <summary>暫存所需下載的大小</summary>
 		private string mMaxSz;
+		/// <summary>暫存下載訊息</summary>
+		private string mInfo;
 		/// <summary>暫存 FTP 站台</summary>
 		private readonly string mSite;
 		/// <summary>暫存 FTP 登入的使用者</summary>
@@ -65,6 +67,14 @@ namespace Ahern.Ftp {
 			set {
 				mMaxSz = value;
 				RaisePropChg("MaximumSize");
+			}
+		}
+		/// <summary>取得下載資訊</summary>
+		public string Info {
+			get => mInfo;
+			set {
+				mInfo = value;
+				RaisePropChg("Info");
 			}
 		}
 		#endregion
