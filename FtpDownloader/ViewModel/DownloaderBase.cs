@@ -1,7 +1,6 @@
 ﻿using Ahern.General;
 using System;
 using System.Collections.Generic;
-using System.ComponentModel;
 using System.IO;
 using System.Linq;
 using System.Threading;
@@ -11,17 +10,9 @@ using System.Windows;
 namespace Ahern.Ftp {
 
 	/// <summary>FTP 下載器</summary>
-	internal class FtpDownloader : IDownloader {
+	internal class FtpDownloader : DownloaderBase {
 
 		#region Fields
-		/// <summary>暫存進度百分比</summary>
-		private double mProg;
-		/// <summary>暫存當前已下載的大小</summary>
-		private string mCurSz;
-		/// <summary>暫存所需下載的大小</summary>
-		private string mMaxSz;
-		/// <summary>暫存下載訊息</summary>
-		private string mInfo;
 		/// <summary>暫存 FTP 站台</summary>
 		private readonly string mSite;
 		/// <summary>暫存 FTP 登入的使用者</summary>
@@ -42,71 +33,6 @@ namespace Ahern.Ftp {
 		private readonly ManualResetEventSlim mStartSign;
 		/// <summary>下載的主執行緒取消物件</summary>
 		private readonly CancellationTokenSource mCncSrc;
-		#endregion
-
-		#region Properties
-
-		#region Window Title
-		/// <summary>取得欲顯示於視窗的標題</summary>
-		public string Caption { get; }
-		#endregion
-
-		#region Progress
-		/// <summary>取得或設定當前的進度百分比</summary>
-		public double Progress {
-			get => mProg;
-			set {
-				mProg = value;
-				RaisePropChg("Progress");
-			}
-		}
-		/// <summary>取得當前已下載的大小</summary>
-		public string CurrentSize {
-			get => mCurSz;
-			set {
-				mCurSz = value;
-				RaisePropChg("CurrentSize");
-			}
-		}
-		/// <summary>取得所需下載的大小</summary>
-		public string MaximumSize {
-			get => mMaxSz;
-			set {
-				mMaxSz = value;
-				RaisePropChg("MaximumSize");
-			}
-		}
-		/// <summary>取得下載資訊</summary>
-		public string Info {
-			get => mInfo;
-			set {
-				mInfo = value;
-				RaisePropChg("Info");
-			}
-		}
-		#endregion
-
-		#region File List
-		/// <summary>取得欲下載的檔案集合</summary>
-		public WpfObservableCollection<IRemoteObject> Files { get; }
-		#endregion
-
-		#endregion
-
-		#region Event
-		/// <summary>所有下載已完成之事件</summary>
-		public event EventHandler DownloadFinished;
-
-		private void RaiseDone() {
-			DownloadFinished?.Invoke(this, null);
-		}
-		#endregion
-
-		#region INotifyPropertyChanged Implements
-		public event PropertyChangedEventHandler PropertyChanged;
-		private void RaisePropChg(string name) {
-			PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
-		}
 		#endregion
 
 		#region Constructor
@@ -140,14 +66,10 @@ namespace Ahern.Ftp {
 			} else {
 				mAutoClose = true;	//預設為自動關閉視窗
 			}
-			mTarDir = EnsureBackSlash(mTarDir.Replace("\"", string.Empty));
+			mTarDir = EnsureSlash(mTarDir.Replace("\"", string.Empty));
 			/* 初始化數值 */
-			mProg = 0.0;
-			mCurSz = "0 KB";
-			mMaxSz = "0 KB";
 			Caption = $"Site: {mSite}";
 			/* 初始化物件 */
-			Files = new WpfObservableCollection<IRemoteObject>();
 			mUnits = Enum.GetValues(typeof(Unit))
 				.Cast<Unit>()
 				.ToDictionary(u => u, u => (decimal)u);
@@ -229,7 +151,7 @@ namespace Ahern.Ftp {
 								dir => {
 									var path = string.IsNullOrEmpty(dir.Directory) ?
 										$"{mTarDir}{dir.Name}" :
-										$"{mTarDir}{EnsureBackSlash(dir.Directory)}{dir.Name}";
+										$"{mTarDir}{EnsureSlash(dir.Directory)}{dir.Name}";
 									Directory.CreateDirectory(path);
 								}
 							);
@@ -254,7 +176,7 @@ namespace Ahern.Ftp {
 							Info = $"Download: {file.Name}";
 							var localFold = string.IsNullOrEmpty(file.Directory) ?
 								mTarDir :
-								$"{mTarDir}{EnsureBackSlash(file.Directory)}";
+								$"{mTarDir}{EnsureSlash(file.Directory)}";
 							mFtp.Download(file, localFold);
 							/* 更新介面 */
 							file.IsFinished = true;
@@ -299,21 +221,14 @@ namespace Ahern.Ftp {
 
 		#region Methods
 		/// <summary>開始進行下載之動作</summary>
-		public void StartDownload() {
+		public override void StartDownload() {
 			mStartSign.Set();
-		}
-
-		/// <summary>確保文字以「/」結尾</summary>
-		/// <param name="data">欲檢查的字串</param>
-		/// <returns>帶有「/」結尾的字串</returns>
-		private string EnsureSlash(string data) {
-			return data.EndsWith("/") ? data : $"{data}/";
 		}
 
 		/// <summary>確保文字以「\」結尾</summary>
 		/// <param name="data">欲檢查的字串</param>
 		/// <returns>帶有「\」結尾的字串</returns>
-		private string EnsureBackSlash(string data) {
+		private string EnsureSlash(string data) {
 			return data.EndsWith(@"\") ? data : $@"{data}\";
 		}
 		#endregion
