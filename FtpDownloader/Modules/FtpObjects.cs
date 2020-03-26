@@ -2,6 +2,7 @@
 using System;
 using System.ComponentModel;
 using System.Linq;
+using System.Text.RegularExpressions;
 
 namespace Ahern.Ftp {
 
@@ -106,10 +107,12 @@ namespace Ahern.Ftp {
 			if (mSpc[0][8] == 'w') Others |= Permission.W;
 			if (mSpc[0][9] == 'x') Others |= Permission.X;
 			/* 日期 */
-			var timeStr = string.Join(" ", mSpc.Skip(5).Take(3));
+			var timeStr = Regex.IsMatch(mSpc[7], "\\d+:\\d+", RegexOptions.IgnoreCase) ?
+				$"{mSpc[5]} {mSpc[6]} {DateTime.Now.Year} {mSpc[7]}" :
+				string.Join(" ", mSpc.Skip(5).Take(3));
 			Time = DateTime.Parse(timeStr);
 			/* 檔名 */
-			Name = mSpc[8];
+			Name = string.Join(" ", mSpc.Skip(8));
 			Uri = uri.EndsWith("/") ? $"{uri}{Name}" : $"{uri}/{Name}";
 		}
 		#endregion
