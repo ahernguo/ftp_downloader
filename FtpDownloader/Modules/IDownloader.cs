@@ -1,4 +1,5 @@
-﻿using System.ComponentModel;
+﻿using System;
+using System.ComponentModel;
 
 namespace Ahern.General {
 
@@ -26,5 +27,14 @@ namespace Ahern.General {
 		WpfObservableCollection<IRemoteObject> Files { get; }
 		#endregion
 
+		#region Events
+		/// <summary>所有下載已完成之事件</summary>
+		event EventHandler DownloadFinished;
+		#endregion
+
+		#region Actions
+		/// <summary>開始進行下載之動作</summary>
+		void StartDownload();
+		#endregion
 	}
 }

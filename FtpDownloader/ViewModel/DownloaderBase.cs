@@ -30,12 +30,16 @@ namespace Ahern.Ftp {
 		private readonly string mPwd;
 		/// <summary>暫存本機下載的目標資料夾</summary>
 		private readonly string mTarDir;
+		/// <summary>暫存下載完畢後是否自動關閉視窗</summary>
+		private readonly bool mAutoClose;
 		/// <summary>操作 FTP 之物件</summary>
 		private readonly FtpClient mFtp;
 		/// <summary>檔案大小容量對應表，用於自動調配單位</summary>
 		private readonly Dictionary<Unit, decimal> mUnits;
 		/// <summary>指出當前是否要繼續下載的暫停旗標</summary>
 		private readonly ManualResetEventSlim mPauseSign;
+		/// <summary>指出是否可以開始進行下載之任務</summary>
+		private readonly ManualResetEventSlim mStartSign;
 		/// <summary>下載的主執行緒取消物件</summary>
 		private readonly CancellationTokenSource mCncSrc;
 		#endregion
@@ -129,6 +133,13 @@ namespace Ahern.Ftp {
 			if (!map.TryGetValue("dir", out mTarDir)) {
 				throw new Exception("Must contains '/dir' command");
 			}
+			if (map.TryGetValue("autoclose", out var autoclose)) {
+				if (!bool.TryParse(autoclose, out mAutoClose)) {
+					throw new Exception("Invalid value of '/AutoClose'. It must be 'true' or 'false'");
+				}
+			} else {
+				mAutoClose = true;	//預設為自動關閉視窗
+			}
 			mTarDir = EnsureBackSlash(mTarDir.Replace("\"", string.Empty));
 			/* 初始化數值 */
 			mProg = 0.0;
@@ -141,6 +152,7 @@ namespace Ahern.Ftp {
 				.ToDictionary(u => u, u => (decimal)u);
 			mFtp = new FtpClient(mSite, mUsr, mPwd);
 			mPauseSign = new ManualResetEventSlim();
+			mStartSign = new ManualResetEventSlim();
 			mCncSrc = new CancellationTokenSource();
 			/* 啟動執行緒 */
 			Task.Factory.StartNew(
@@ -180,6 +192,10 @@ namespace Ahern.Ftp {
 			var dirs = new List<FtpDirectoy>();
 			var created = new List<string>();
 			try {
+				/* 卡住直到介面顯示完成 */
+				Info = "Waiting...";
+				mStartSign.Wait();
+				SpinWait.SpinUntil(() => false, 100);
 				/* 一直跑，直到完成或取消工作 */
 				while (!cncToken.IsCancellationRequested && step < 100) {
 					switch (step) {
@@ -243,12 +259,14 @@ namespace Ahern.Ftp {
 							break;
 						case 5: /* 下載完成，等待一秒 */
 							Info = "Finished";
-							Task.Factory.StartNew(
-								() => {
-									SpinWait.SpinUntil(() => false, TimeSpan.FromSeconds(1));
-									RaiseDone();
-								}
-							);
+							if (mAutoClose) {
+								Task.Factory.StartNew(
+									() => {
+										SpinWait.SpinUntil(() => false, TimeSpan.FromSeconds(1));
+										RaiseDone();
+									}
+								);
+							}
 							step = 100;	//離開
 							break;
 						default:
@@ -273,6 +291,11 @@ namespace Ahern.Ftp {
 		#endregion
 
 		#region Methods
+		/// <summary>開始進行下載之動作</summary>
+		public void StartDownload() {
+			mStartSign.Set();
+		}
+
 		/// <summary>確保文字以「/」結尾</summary>
 		/// <param name="data">欲檢查的字串</param>
 		/// <returns>帶有「/」結尾的字串</returns>
