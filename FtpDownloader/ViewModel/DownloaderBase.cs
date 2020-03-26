@@ -2,6 +2,7 @@
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
+using System.IO;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -27,10 +28,12 @@ namespace Ahern.Ftp {
 		private readonly string mUsr;
 		/// <summary>暫存 FTP 登入的密碼</summary>
 		private readonly string mPwd;
+		/// <summary>暫存本機下載的目標資料夾</summary>
+		private readonly string mTarDir;
 		/// <summary>操作 FTP 之物件</summary>
 		private readonly FtpClient mFtp;
 		/// <summary>檔案大小容量對應表，用於自動調配單位</summary>
-		private readonly Dictionary<Unit, int> mUnits;
+		private readonly Dictionary<Unit, decimal> mUnits;
 		/// <summary>指出當前是否要繼續下載的暫停旗標</summary>
 		private readonly ManualResetEventSlim mPauseSign;
 		/// <summary>下載的主執行緒取消物件</summary>
@@ -86,6 +89,15 @@ namespace Ahern.Ftp {
 
 		#endregion
 
+		#region Event
+		/// <summary>所有下載已完成之事件</summary>
+		public event EventHandler DownloadFinished;
+
+		private void RaiseDone() {
+			DownloadFinished?.Invoke(this, null);
+		}
+		#endregion
+
 		#region INotifyPropertyChanged Implements
 		public event PropertyChangedEventHandler PropertyChanged;
 		private void RaisePropChg(string name) {
@@ -114,6 +126,10 @@ namespace Ahern.Ftp {
 			if (!map.TryGetValue("pwd", out mPwd)) {
 				throw new Exception("Must contains '/pwd' command");
 			}
+			if (!map.TryGetValue("dir", out mTarDir)) {
+				throw new Exception("Must contains '/dir' command");
+			}
+			mTarDir = EnsureBackSlash(mTarDir.Replace("\"", string.Empty));
 			/* 初始化數值 */
 			mProg = 0.0;
 			mCurSz = "0 KB";
@@ -122,7 +138,7 @@ namespace Ahern.Ftp {
 			Files = new WpfObservableCollection<IRemoteObject>();
 			mUnits = Enum.GetValues(typeof(Unit))
 				.Cast<Unit>()
-				.ToDictionary(u => u, u => (int)u);
+				.ToDictionary(u => u, u => (decimal)u);
 			mFtp = new FtpClient(mSite, mUsr, mPwd);
 			mPauseSign = new ManualResetEventSlim();
 			mCncSrc = new CancellationTokenSource();
@@ -138,21 +154,17 @@ namespace Ahern.Ftp {
 
 		#region Utilities
 		/// <summary>計算當前的容量大小，自動調配單位</summary>
-		/// <param name="curSz">當前的容量大小</param>
-		/// <param name="curUnit">當前的單位</param>
+		/// <param name="size">當前的容量大小</param>
 		/// <returns>自動調配後的字串</returns>
-		private string ToChunkSize(ref double curSz, ref Unit curUnit) {
-			/* 如果大小已大於 1024，則取得下一個單位並重新計算大小 */
-			if (curSz > 1024.0 && curUnit < Unit.GB) {
-				/* 找出此單位的下一個等級 */
-				var unitValue = (int)curUnit;
-				var kvp = mUnits.FirstOrDefault(p => p.Value > unitValue);
-				/* 賦值並重新計算 */
-				curUnit = kvp.Key;
-				curSz /= 1024.0;
+		private string ToChunkSize(decimal size) {
+			/* 嘗試找出比此範圍大的級距，如 1050 bytes 會找到 Units.KB (1024) */
+			var match = mUnits.LastOrDefault(kvp => size > kvp.Value);
+			if (match.Value > 0) {
+				var sz = size / match.Value;
+				return $"{sz:F2} {match.Key}";
+			} else {
+				throw new Exception("Can not find match unit");
 			}
-			/* 組合字串並回傳 */
-			return $"{curSz:F2} {curUnit.ToString()}";
 		}
 		#endregion
 
@@ -160,17 +172,94 @@ namespace Ahern.Ftp {
 		private void DownloadProcess() {
 			var cncToken = Task.Factory.CancellationToken;
 			var step = 0;
+			var idx = 0;
+			decimal curSz = 0;
+			decimal maxSz = 0;
+			decimal lastSz = 0;
+			var files = new List<FtpFile>();
+			var dirs = new List<FtpDirectoy>();
+			var created = new List<string>();
 			try {
 				/* 一直跑，直到完成或取消工作 */
 				while (!cncToken.IsCancellationRequested && step < 100) {
 					switch (step) {
 						case 0: /* 取出所有檔案 */
-							var files = new List<FtpFile>();
-							FindAllFiles(files);
+							Info = "Searching files...";
+							mFtp.ListAllObjects(files, dirs);
+							step++;
+							break;
+						case 1:	/* 將檔案加入集合 */
+							Info = "Pending files...";
+							files.ForEach(f => Files.Add(f));
+							step++;
+							break;
+						case 2:	/* 計算總大小 */
+							Info = "Calculating size...";
+							maxSz = files.Sum(f => f.FileSize);
+							MaximumSize = ToChunkSize(maxSz);
+							step++;
+							break;
+						case 3:	/* 準備下載 */
+							Info = "Prepare to download...";
+							/* 建立根目錄 */
+							Directory.CreateDirectory(mTarDir);
+							/* 建立各個子資料夾 */
+							dirs.ForEach(
+								dir => {
+									var path = string.IsNullOrEmpty(dir.Directory) ?
+										$"{mTarDir}{dir.Name}" :
+										$"{mTarDir}{EnsureBackSlash(dir.Directory)}{dir.Name}";
+									Directory.CreateDirectory(path);
+								}
+							);
+							/* 註冊事件 */
+							mFtp.ProgressUpdated += (sender, e) => {
+								/* 如果已經下載好，更新 curSz 並更改 CheckBox 狀態 */
+								if (e.IsFinished) {
+									curSz += e.FullSize;
+									CurrentSize = ToChunkSize(curSz);
+								} else {
+									/* 還沒下載好，不能更新 curSz，先用暫存的 */
+									lastSz = curSz + e.CurrentSize;
+									CurrentSize = ToChunkSize(lastSz);
+								}
+							};
+							step++;
+							break;
+						case 4: /* 循環直至下載完畢 */
+							var file = files[idx++];
+							/* 更改訊息 */
+							Info = $"Download: {file.Name}";
+							var localFold = string.IsNullOrEmpty(file.Directory) ?
+								mTarDir :
+								$"{mTarDir}{EnsureBackSlash(file.Directory)}";
+							mFtp.Download(file, localFold);
+							/* 更新介面 */
+							file.IsFinished = true;
+							/* 如果已經都抓完，跳下一步 */
+							if (idx.Equals(files.Count)) {
+								step++;
+							}
+							break;
+						case 5: /* 下載完成，等待一秒 */
+							Info = "Finished";
+							Task.Factory.StartNew(
+								() => {
+									SpinWait.SpinUntil(() => false, TimeSpan.FromSeconds(1));
+									RaiseDone();
+								}
+							);
+							step = 100;	//離開
 							break;
 						default:
 							break;
 					}
+					/* 更新進度條 */
+					if (maxSz > 0) {
+						Progress = (double)Math.Min(Math.Max(curSz, lastSz) / maxSz, 1) * 100.0;
+					}
+					/* 體感延遲一下 */
+					SpinWait.SpinUntil(() => false, 100);
 				}
 			} catch (Exception ex) {
 				MessageBox.Show(
@@ -184,30 +273,18 @@ namespace Ahern.Ftp {
 		#endregion
 
 		#region Methods
-		/// <summary>確保字串後方帶有斜線</summary>
+		/// <summary>確保文字以「/」結尾</summary>
 		/// <param name="data">欲檢查的字串</param>
-		/// <returns>帶有斜線的字串</returns>
+		/// <returns>帶有「/」結尾的字串</returns>
 		private string EnsureSlash(string data) {
 			return data.EndsWith("/") ? data : $"{data}/";
 		}
 
-		/// <summary>列出所有 FTP 檔案</summary>
-		/// <param name="files">欲儲存檔案的集合</param>
-		/// <param name="subDir">子目錄</param>
-		private void FindAllFiles(IList<FtpFile> files, string subDir = null) {
-			/* 列出此資料夾所有的物件 */
-			var objs = mFtp.ListObjects(subDir);
-			/* 取出檔案並加入集合 */
-			var fObjs = objs.Where(o => o is FtpFile);
-			foreach (FtpFile fObj in fObjs) {
-				files.Add(fObj);
-			}
-			/* 取出資料夾並遞迴 */
-			var dObjs = objs.Where(o => o is FtpDirectoy);
-			foreach (FtpDirectoy dObj in dObjs) {
-				var subName = string.IsNullOrEmpty(subDir) ? dObj.Name : $"{EnsureSlash(subDir)}{dObj.Name}";
-				FindAllFiles(files, subName);
-			}
+		/// <summary>確保文字以「\」結尾</summary>
+		/// <param name="data">欲檢查的字串</param>
+		/// <returns>帶有「\」結尾的字串</returns>
+		private string EnsureBackSlash(string data) {
+			return data.EndsWith(@"\") ? data : $@"{data}\";
 		}
 		#endregion
 	}

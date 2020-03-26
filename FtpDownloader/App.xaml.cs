@@ -1,14 +1,13 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Configuration;
-using System.Data;
-using System.Linq;
-using System.Windows;
+﻿using System.Windows;
 
-namespace FtpDownloader {
-	/// <summary>
-	/// App.xaml 的互動邏輯
-	/// </summary>
+namespace Ahern.GUI {
+
+	/// <summary>主介面之進入點</summary>
 	public partial class App : Application {
+		private void Application_Startup(object sender, StartupEventArgs e) {
+			var context = new Ftp.FtpDownloader(e.Args);
+			var wind = new MainWindow(context);
+			wind.Show();
+		}
 	}
 }
