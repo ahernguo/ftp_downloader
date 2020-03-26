@@ -81,12 +81,18 @@ namespace Ahern.Ftp {
 		}
 		#endregion
 
+		#region Properties
+		/// <summary>取得此物件所在的資料夾</summary>
+		public string Directory { get; }
+		#endregion
+
 		#region Constructor
-		internal FtpObject(string uri, string line) {
+		internal FtpObject(string uri, string line, string curDir = null) {
 			/* 初始化變數 */
 			mIsDone = false;
 			/* 紀錄原始字串 */
 			OriginString = line;
+			Directory = curDir;
 			/* 分割 */
 			mSpc = line.Split(SPACE_SPLITTER, StringSplitOptions.RemoveEmptyEntries);
 			/* 權限 */
@@ -113,16 +119,20 @@ namespace Ahern.Ftp {
 	internal class FtpFile : FtpObject {
 
 		#region Properties
-		/// <summary>取得檔案大小，單位為 kB</summary>
-		public int FileSize { get; }
+		/// <summary>取得檔案大小，單位為 Bytes</summary>
+		public decimal FileSize { get; }
 		/// <summary>取得此檔案所在的資料夾路徑</summary>
 		public string DirectoryUri { get; }
 		#endregion
 
 		#region Constructor
-		internal FtpFile(string uri, string line) : base(uri, line) {
+		/// <summary>建構 FTP 檔案</summary>
+		/// <param name="uri">對應的 URI 網址</param>
+		/// <param name="line">欲解析的回應</param>
+		/// <param name="curDir">此檔案當前的 FTP 資料夾</param>
+		internal FtpFile(string uri, string line, string curDir = null) : base(uri, line, curDir) {
 			/* 檔案大小 */
-			FileSize = int.Parse(mSpc[4]);
+			FileSize = decimal.Parse(mSpc[4]);
 			/* 資料夾路徑 */
 			DirectoryUri = uri;
 			/* 清除分割暫存 */
@@ -144,7 +154,11 @@ namespace Ahern.Ftp {
 	internal class FtpDirectoy : FtpObject {
 
 		#region Constructor
-		internal FtpDirectoy(string uri, string line) : base(uri, line) {
+		/// <summary>建構 FTP 資料夾</summary>
+		/// <param name="uri">對應的 URI 網址</param>
+		/// <param name="line">欲解析的回應</param>
+		/// <param name="curDir">此資料夾當前的 FTP 資料夾</param>
+		internal FtpDirectoy(string uri, string line, string curDir = null) : base(uri, line, curDir) {
 			/* 清除分割暫存 */
 			Array.Clear(mSpc, 0, mSpc.Length);
 			mSpc = null;
