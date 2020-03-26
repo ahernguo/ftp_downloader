@@ -140,6 +140,10 @@ namespace Ahern.Ftp {
 							Info = "Calculating size...";
 							maxSz = files.Sum(f => f.FileSize);
 							MaximumSize = ToChunkSize(maxSz);
+							/* 如果 maxSz 有問題，噴出去取消動作 */
+							if (maxSz <= 0) {
+								throw new Exception("Calculate size failed.");
+							}
 							step++;
 							delay = 500;
 							break;
@@ -160,12 +164,17 @@ namespace Ahern.Ftp {
 							mFtp.ProgressUpdated += (sender, e) => {
 								/* 如果已經下載好，更新 curSz 並更改 CheckBox 狀態 */
 								if (e.IsFinished) {
+									/* 累加總下載量 */
 									curSz += e.FullSize;
+									/* 更新當前大小與進度 */
 									CurrentSize = ToChunkSize(curSz);
+									Progress = (double)(curSz / maxSz) * 100.0;
 								} else {
 									/* 還沒下載好，不能更新 curSz，先用暫存的 */
 									lastSz = curSz + e.CurrentSize;
+									/* 更新當前大小與進度 */
 									CurrentSize = ToChunkSize(lastSz);
+									Progress = (double)(lastSz / maxSz) * 100.0;
 								}
 							};
 							step++;
@@ -201,10 +210,6 @@ namespace Ahern.Ftp {
 							break;
 						default:
 							break;
-					}
-					/* 更新進度條 */
-					if (maxSz > 0) {
-						Progress = (double)Math.Min(Math.Max(curSz, lastSz) / maxSz, 1) * 100.0;
 					}
 					/* 體感延遲一下 */
 					SpinWait.SpinUntil(() => false, delay);
