@@ -38,6 +38,7 @@
 				Text="{Binding Progress, StringFormat={}{0:F2}%}"/>
 		</Grid>
 		<DataGrid Grid.Row="2" Margin="5,5,5,5" IsReadOnly="True"
+			HeadersVisibility="Column"
 			CanUserReorderColumns="False" CanUserResizeColumns="False"
 			CanUserResizeRows="False" CanUserSortColumns="False"
 			AutoGenerateColumns="False" ItemsSource="{Binding Files, UpdateSourceTrigger=PropertyChanged}">
