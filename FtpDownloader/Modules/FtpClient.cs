@@ -21,6 +21,8 @@ namespace Ahern.Ftp {
 		private Lazy<byte[]> mBuf;
 		/// <summary>讀取或上傳用的緩衝區數量</summary>
 		private int mCnt;
+		/// <summary>暫存事件之參數</summary>
+		private ProgressEventArgs mEvtArg;
 		#endregion
 
 		#region Properties
@@ -28,11 +30,21 @@ namespace Ahern.Ftp {
 		public string HostName { get; }
 		#endregion
 
+		#region Events
+		/// <summary>下載進度更新事件</summary>
+		public event EventHandler<ProgressEventArgs> ProgressUpdated;
+
+		private void RaiseUpd() {
+			ProgressUpdated?.Invoke(this, mEvtArg);
+		}
+		#endregion
+
 		#region Constructor
 		public FtpClient(string hostName, string userName, string password) {
 			HostName = DelSlash(hostName);
 			mCred = new NetworkCredential(userName, password);
 			mBuf = new Lazy<byte[]>(() => new byte[BUFFER_LENGTH]);
+			mEvtArg = new ProgressEventArgs();
 		}
 		#endregion
 
@@ -133,12 +145,33 @@ namespace Ahern.Ftp {
 					objects = rspStr
 						.Split(new char[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries)
 						.Select(
-							line => 'd'.Equals(line[0]) ? new FtpDirectoy(uri, line) : new FtpFile(uri, line) as IFtpObject
+							line => 'd'.Equals(line[0]) ? new FtpDirectoy(uri, line, subDir) : new FtpFile(uri, line, subDir) as IFtpObject
 						).ToList();
 				}
 			}
 			/* 回傳 */
 			return objects;
+		}
+
+		/// <summary>列出指定資料夾內的所有檔案</summary>
+		/// <param name="files">欲儲存檔案清單的集合</param>
+		/// <param name="directoys">欲儲存資料夾清單的集合</param>
+		/// <param name="subDir">(null)取得根目錄資訊  (others)取得子資料夾之資訊，如欲取得 "ftp://localhost/Recipe/MotionA" 則此處帶入 @"Recipe/MotionA"</param>
+		public void ListAllObjects(IList<FtpFile> files, IList<FtpDirectoy> directoys, string subDir = null) {
+			/* 列出此資料夾所有的物件 */
+			var objs = ListObjects(subDir);
+			/* 取出檔案並加入集合 */
+			var fObjs = objs.Where(o => o is FtpFile);
+			foreach (FtpFile fObj in fObjs) {
+				files.Add(fObj);
+			}
+			/* 取出資料夾並遞迴 */
+			var dObjs = objs.Where(o => o is FtpDirectoy);
+			foreach (FtpDirectoy dObj in dObjs) {
+				directoys.Add(dObj);
+				var subName = string.IsNullOrEmpty(subDir) ? dObj.Name : $"{AddSlash(subDir)}{dObj.Name}";
+				ListAllObjects(files, directoys, subName);
+			}
 		}
 		#endregion
 
@@ -158,11 +191,25 @@ namespace Ahern.Ftp {
 				using (var sr = rsp.GetResponseStream()) {
 					/* 開啟本地檔案的串流 */
 					using (var fs = new FileStream(path, FileMode.Create)) {
-						mCnt = BUFFER_LENGTH;	//因為 while 條件，先讓他跑第一次
+						/* 重設旗標 */
+						mEvtArg.File = file;
+						mEvtArg.CurrentSize = 0;
+						mEvtArg.FullSize = file.FileSize;
+						/* 因為 while 條件，先讓他跑第一次 */
+						mCnt = BUFFER_LENGTH;
 						while (mCnt >= BUFFER_LENGTH) {
 							mCnt = sr.Read(mBuf.Value, 0, BUFFER_LENGTH);
 							if (mCnt > 0) {
 								fs.Write(mBuf.Value, 0, mCnt);
+								/* 發布事件 */
+								mEvtArg.CurrentSize += mCnt;
+								/* 如果已經少於 BUFFER 數量，表示下載完成 */
+								mEvtArg.IsFinished = mCnt < BUFFER_LENGTH;
+								RaiseUpd();
+							} else {
+								/* 表示已滿 */
+								mEvtArg.IsFinished = true;
+								RaiseUpd();
 							}
 						}
 					}
@@ -359,6 +406,29 @@ namespace Ahern.Ftp {
 			Dispose(true);
 			// TODO: 如果上方的完成項已被覆寫，即取消下行的註解狀態。
 			// GC.SuppressFinalize(this);
+		}
+		#endregion
+	}
+
+	/// <summary>下載進度之事件參數</summary>
+	internal class ProgressEventArgs : EventArgs {
+
+		#region Properties
+		/// <summary>取得或設定當前發生變化的檔案</summary>
+		public FtpFile File { get; set; }
+		/// <summary>取得或設定當前已下載的大小</summary>
+		public decimal CurrentSize { get; set; }
+		/// <summary>取得此檔案目標大小</summary>
+		public decimal FullSize { get; set; }
+		/// <summary>取得或設定是否已下載完成</summary>
+		public bool IsFinished { get; set; }
+		#endregion
+
+		#region Constructor
+		/// <summary>建構下載進度參數</summary>
+		public ProgressEventArgs() {
+			FullSize = 0;
+			CurrentSize = 0;
 		}
 		#endregion
 	}
