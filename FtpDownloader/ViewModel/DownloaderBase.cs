@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
@@ -230,6 +231,34 @@ namespace Ahern.Ftp {
 		/// <returns>帶有「\」結尾的字串</returns>
 		private string EnsureSlash(string data) {
 			return data.EndsWith(@"\") ? data : $@"{data}\";
+		}
+		#endregion
+
+		#region Help Info
+		/// <summary>取得 FTP 下載器之命令參數</summary>
+		/// <returns>命令參數列表</returns>
+		public static string Help() {
+			var sb = new StringBuilder();
+			sb.AppendLine("FTP Downloader (fdn) Usage:");
+			sb.AppendLine("    fdn /Site /User /Pwd /Dir [/AutoClose]");
+			sb.AppendLine();
+			sb.AppendLine("** Commands are case insensitive **");
+			sb.AppendLine("");
+			sb.AppendLine("Commands:");
+			sb.AppendLine("    /Site\tFTP 站點");
+			sb.AppendLine("\t如 '/Site=192.168.1.1'");
+			sb.AppendLine("    /User\tFTP 站點的登入帳號");
+			sb.AppendLine("\t如 '/User=root'");
+			sb.AppendLine("    /Pwd\tFTP 登入帳號的對應密碼(不接受空白密碼)");
+			sb.AppendLine("\t如 '/Pwd=rootPassword'");
+			sb.AppendLine("    /Dir\t下載後欲存放的本機資料夾，空白請加上雙引號");
+			sb.AppendLine("\t如 '/Dir=\"D:\\Company Recipes\"'");
+			sb.AppendLine();
+			sb.AppendLine("Optionals:");
+			sb.AppendLine("    /AutoClose  下載完畢是否自動關閉視窗(延遲一秒)");
+			sb.AppendLine("\t數值必為 'true' 或 'false'。如 '/AutoCloase=True'");
+			sb.AppendLine();
+			return sb.ToString();
 		}
 		#endregion
 	}
