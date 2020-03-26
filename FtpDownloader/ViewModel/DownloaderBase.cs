@@ -145,6 +145,7 @@ namespace Ahern.Ftp {
 			mProg = 0.0;
 			mCurSz = "0 KB";
 			mMaxSz = "0 KB";
+			Caption = $"Site: {mSite}";
 			/* 初始化物件 */
 			Files = new WpfObservableCollection<IRemoteObject>();
 			mUnits = Enum.GetValues(typeof(Unit))
@@ -185,6 +186,7 @@ namespace Ahern.Ftp {
 			var cncToken = Task.Factory.CancellationToken;
 			var step = 0;
 			var idx = 0;
+			var delay = 500;
 			decimal curSz = 0;
 			decimal maxSz = 0;
 			decimal lastSz = 0;
@@ -195,7 +197,7 @@ namespace Ahern.Ftp {
 				/* 卡住直到介面顯示完成 */
 				Info = "Waiting...";
 				mStartSign.Wait();
-				SpinWait.SpinUntil(() => false, 100);
+				SpinWait.SpinUntil(() => false, 500);
 				/* 一直跑，直到完成或取消工作 */
 				while (!cncToken.IsCancellationRequested && step < 100) {
 					switch (step) {
@@ -203,17 +205,20 @@ namespace Ahern.Ftp {
 							Info = "Searching files...";
 							mFtp.ListAllObjects(files, dirs);
 							step++;
+							delay = 500;
 							break;
 						case 1:	/* 將檔案加入集合 */
 							Info = "Pending files...";
 							files.ForEach(f => Files.Add(f));
 							step++;
+							delay = 500;
 							break;
 						case 2:	/* 計算總大小 */
 							Info = "Calculating size...";
 							maxSz = files.Sum(f => f.FileSize);
 							MaximumSize = ToChunkSize(maxSz);
 							step++;
+							delay = 500;
 							break;
 						case 3:	/* 準備下載 */
 							Info = "Prepare to download...";
@@ -241,6 +246,7 @@ namespace Ahern.Ftp {
 								}
 							};
 							step++;
+							delay = 500;
 							break;
 						case 4: /* 循環直至下載完畢 */
 							var file = files[idx++];
@@ -256,6 +262,7 @@ namespace Ahern.Ftp {
 							if (idx.Equals(files.Count)) {
 								step++;
 							}
+							delay = 10;
 							break;
 						case 5: /* 下載完成，等待一秒 */
 							Info = "Finished";
@@ -277,7 +284,7 @@ namespace Ahern.Ftp {
 						Progress = (double)Math.Min(Math.Max(curSz, lastSz) / maxSz, 1) * 100.0;
 					}
 					/* 體感延遲一下 */
-					SpinWait.SpinUntil(() => false, 100);
+					SpinWait.SpinUntil(() => false, delay);
 				}
 			} catch (Exception ex) {
 				MessageBox.Show(
