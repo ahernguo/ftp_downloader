@@ -196,21 +196,15 @@ namespace Ahern.Ftp {
 						mEvtArg.CurrentSize = 0;
 						mEvtArg.FullSize = file.FileSize;
 						/* 因為 while 條件，先讓他跑第一次 */
-						mCnt = BUFFER_LENGTH;
-						while (mCnt >= BUFFER_LENGTH) {
+						while (mEvtArg.CurrentSize < mEvtArg.FullSize) {
 							mCnt = sr.Read(mBuf.Value, 0, BUFFER_LENGTH);
 							if (mCnt > 0) {
 								fs.Write(mBuf.Value, 0, mCnt);
-								/* 發布事件 */
+								/* 累計當前數量 */
 								mEvtArg.CurrentSize += mCnt;
-								/* 如果已經少於 BUFFER 數量，表示下載完成 */
-								mEvtArg.IsFinished = mCnt < BUFFER_LENGTH;
-								RaiseUpd();
-							} else {
-								/* 表示已滿 */
-								mEvtArg.IsFinished = true;
-								RaiseUpd();
 							}
+							/* 發報更新 */
+							RaiseUpd();
 						}
 					}
 				}
@@ -421,7 +415,7 @@ namespace Ahern.Ftp {
 		/// <summary>取得此檔案目標大小</summary>
 		public decimal FullSize { get; set; }
 		/// <summary>取得或設定是否已下載完成</summary>
-		public bool IsFinished { get; set; }
+		public bool IsFinished => CurrentSize == FullSize;
 		#endregion
 
 		#region Constructor
